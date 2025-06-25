@@ -35,23 +35,10 @@ def talk_with_jarvis():
                     try:
                         command = r.recognize_google(audio).lower()
                         print(f"Heard: {command}")
-                        if end_word_detection(command, messages, conversation_active): # any(kw in command.lower() for kw in end_keywords):
+                        conversation_active = end_word_detection(command, messages, conversation_active)
+                        if not conversation_active:
                             continue
-                        messages.append({'role': 'user', 'content': command})
-                        # Query Ollama with conversation history
-                        response = ollama.chat(model=model_name, messages=messages)
-                        response_content = response['message']['content']
-                        if '</think>' in response_content:
-                            response_content = response_content.split('</think>', 1)[1].strip()
-                        else:
-                            response_content = response_content
-                        # Print and speak Ollama's response
-                        print(f"Bhai: {response_content}")
-                        tts_engine.setProperty('voice', assistant_voice)
-                        tts_engine.say(response_content)
-                        tts_engine.runAndWait()
-                        # Add assistant reply to conversation history
-                        messages.append({'role': 'assistant', 'content': response_content})
+                        messages = conversation(messages, command)
                     except sr.UnknownValueError:
                         print("Could not understand command.")
                     except sr.RequestError as e:
@@ -90,11 +77,29 @@ def end_word_detection(command, messages, conversation_active):
             for msg in messages[1:]:
                 hf.write(f"{msg['role']}: {msg['content']}\n")
                 hf.write("\n")
-        conversation_active = False
         messages.clear()
-        return True
+        conversation_active = False
     else:
-        return False
+        conversation_active = True
+    return conversation_active
+
+def conversation(messages, command):
+    messages.append({'role': 'user', 'content': command})
+    # Query Ollama with conversation history
+    response = ollama.chat(model=model_name, messages=messages)
+    response_content = response['message']['content']
+    if '</think>' in response_content:
+        response_content = response_content.split('</think>', 1)[1].strip()
+    else:
+        response_content = response_content
+    # Print and speak Ollama's response
+    print(f"Bhai: {response_content}")
+    tts_engine.setProperty('voice', assistant_voice)
+    tts_engine.say(response_content)
+    tts_engine.runAndWait()
+    # Add assistant reply to conversation history
+    messages.append({'role': 'assistant', 'content': response_content})
+    return messages
 
 def main():
     talk_with_jarvis()
